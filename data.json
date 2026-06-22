@@ -1,4 +1,4 @@
-window.MEMORIAL_DATA = [
+[
   {
     "name": "ליבשטיין אופיר ז\"ל",
     "community": "כפר עזה",
@@ -3579,4 +3579,4 @@ window.MEMORIAL_DATA = [
     "candleDatesLine": "נולד: 7.7.1936 | נרצח: כ״ב בתשרי תשפ״ד",
     "candleMemoryLine": "האור, הטוב והאהבה של חיים ימשיכו להאיר בלב אוהביו לנצח."
   }
-];
+]
