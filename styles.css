@@ -559,3 +559,59 @@ img, svg { display: block; max-width: 100%; }
     linear-gradient(180deg, rgba(5, 17, 30, .96), rgba(10, 31, 48, .92));
   filter: grayscale(1) saturate(.02) contrast(1.12) brightness(.94) !important;
 }
+
+
+/* v46: portraits stay zoomed out and black-and-white */
+.portrait-img,
+.family-photo-img {
+  object-fit: contain !important;
+  object-position: center center !important;
+  filter: grayscale(1) saturate(.02) contrast(1.12) brightness(.94) !important;
+}
+
+/* v47 — smoother equal rotation polish, keeping the existing visual design */
+.person-node {
+  will-change: opacity, transform;
+  transition:
+    opacity 1.55s cubic-bezier(.22, .61, .36, 1),
+    transform 1.55s cubic-bezier(.22, .61, .36, 1),
+    filter .35s ease;
+}
+
+.person-node.is-leaving {
+  filter: blur(.15px);
+}
+
+.ghost-btn:disabled,
+.ghost-btn[aria-disabled="true"] {
+  cursor: default;
+  opacity: .48;
+  transform: none;
+  box-shadow: 0 10px 30px rgba(0, 5, 14, .18);
+}
+
+/* Keep portraits fully visible and black-and-white, without accidental zooming */
+.portrait-img,
+.family-photo-img {
+  transform: none !important;
+}
+
+.person-button:hover .portrait-img,
+.person-button:focus-visible .portrait-img {
+  transform: none !important;
+}
+
+.story-panel:focus-visible,
+.close-story:focus-visible,
+.family-link:focus-visible,
+.ghost-btn:focus-visible,
+.search-box:focus-within {
+  outline: 2px solid rgba(239,251,255,.78);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .person-node {
+    transition-duration: .2s !important;
+  }
+}

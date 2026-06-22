@@ -1,7 +1,8 @@
 "use strict";
 
-const ROTATE_MS = 18000;
+const ROTATE_MS = 10500;
 const FADE_MS = 1550;
+const SEARCH_DEBOUNCE_MS = 160;
 const DEFAULT_DEATH_DATE = "07/10/2023";
 
 const DESKTOP_POINTS = [
@@ -43,9 +44,15 @@ const state = {
   pageIndex: 0,
   paused: false,
   timer: null,
+  searchTimer: null,
+  renderToken: 0,
   modalPersonId: null,
   lastFocusedElement: null,
+  reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
 };
+
+let nameIndex = new Map();
+let cachedPointMode = "";
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -71,8 +78,12 @@ function announce(message) {
   window.setTimeout(() => { els.announcer.textContent = message; }, 30);
 }
 
+function pointMode() {
+  return window.matchMedia("(max-width: 900px)").matches ? "mobile" : "desktop";
+}
+
 function points() {
-  return window.matchMedia("(max-width: 900px)").matches ? MOBILE_POINTS : DESKTOP_POINTS;
+  return pointMode() === "mobile" ? MOBILE_POINTS : DESKTOP_POINTS;
 }
 
 function pageSize() {
@@ -96,16 +107,18 @@ function displayName(personOrName) {
     if (personOrName.excelDisplayName) return stripMemorialSuffix(personOrName.excelDisplayName);
     return displayName(personOrName.name);
   }
+
   const clean = stripMemorialSuffix(personOrName);
   const parts = clean.split(/\s+/u).filter(Boolean);
   if (parts.length <= 1) return clean;
 
-  const compound = [
+  const compoundSurnames = [
     ["ערבה", "אליעז"],
     ["גולדשטיין", "אלמוג"],
+    ["ברדיצ'סקי", "רוזנפלד"],
   ];
 
-  for (const surname of compound) {
+  for (const surname of compoundSurnames) {
     if (surname.every((part, i) => parts[i] === part) && parts.length > surname.length) {
       return [...parts.slice(surname.length), ...surname].join(" ");
     }
@@ -135,22 +148,26 @@ function formatBirthDate(person) {
 }
 
 function formatDeathDate(person) {
-  if (person.deathDate) return parseNumericDate(person.deathDate) || person.deathDate;
-  const text = `${person.storySummaryClean || ""} ${person.storySummary || ""} ${person.candleDatesLine || ""}`;
-  if (/7\s+באוקטובר\s+2023/u.test(text) || /כ["״']?ב\s+בתשרי\s+תשפ["״']?ד/u.test(text)) return DEFAULT_DEATH_DATE;
-  return DEFAULT_DEATH_DATE;
+  return parseNumericDate(person.deathDate) || DEFAULT_DEATH_DATE;
 }
 
 function getPhotoSources(person) {
   const photo = String(person.photo || "").trim();
   if (!photo) return { src: "", fallback: "" };
-  const fallback = photo.replace("images/people-original/", "images/people/").replace(/\.jpg$/i, ".webp");
+
+  const fallback = photo
+    .replace("images/people-original/", "images/people/")
+    .replace(/\.(jpe?g|png)$/i, ".webp");
+
   return { src: photo, fallback: fallback !== photo ? fallback : "" };
 }
 
 function createPortrait(person, eager = false) {
   const sources = getPhotoSources(person);
-  if (!sources.src) return el("span", { class: "portrait-placeholder", text: initials(person), "aria-hidden": "true" });
+  if (!sources.src) {
+    return el("span", { class: "portrait-placeholder", text: initials(person), "aria-hidden": "true" });
+  }
+
   const img = el("img", {
     class: "portrait-img",
     src: sources.src,
@@ -158,6 +175,7 @@ function createPortrait(person, eager = false) {
     loading: eager ? "eager" : "lazy",
     decoding: "async",
   });
+
   let triedFallback = false;
   img.onerror = () => {
     if (!triedFallback && sources.fallback) {
@@ -168,6 +186,7 @@ function createPortrait(person, eager = false) {
     img.onerror = null;
     img.replaceWith(el("span", { class: "portrait-placeholder", text: initials(person), "aria-hidden": "true" }));
   };
+
   return img;
 }
 
@@ -175,29 +194,28 @@ function normalizePerson(person, index) {
   return {
     ...person,
     id: person.id || `person-${String(index + 1).padStart(3, "0")}`,
+    _originalIndex: index,
   };
 }
 
 function buildNameIndex(people) {
   const map = new Map();
   people.forEach((person) => {
-    [person.name, person.excelDisplayName, person.updatedExcelName, displayName(person)].filter(Boolean).forEach((name) => {
-      map.set(cleanKey(name), person);
-    });
+    [person.name, person.excelDisplayName, person.updatedExcelName, displayName(person)]
+      .filter(Boolean)
+      .forEach((name) => map.set(cleanKey(name), person));
   });
   return map;
 }
-
-let nameIndex = new Map();
 
 function findPersonByName(name) {
   return nameIndex.get(cleanKey(name)) || null;
 }
 
-
 function familyPhotoSection(person) {
   const src = String(person.familyGroupPhoto || "").trim();
   if (!src) return null;
+
   const title = person.familyGroupTitle || "תמונה משפחתית";
   const img = el("img", {
     class: "family-photo-img",
@@ -206,10 +224,12 @@ function familyPhotoSection(person) {
     loading: "lazy",
     decoding: "async",
   });
+
   img.onerror = () => {
     const card = img.closest(".family-photo-card");
     if (card) card.remove();
   };
+
   return el("section", { class: "family-photo-card", "aria-label": title },
     el("div", { class: "family-photo-frame" }, img),
     el("p", { class: "family-photo-caption", text: title })
@@ -246,47 +266,65 @@ function searchText(person) {
   return cleanKey([
     person.name,
     person.excelDisplayName,
+    person.updatedExcelName,
     displayName(person),
-    person.community,
-    person.familyGroupTitle,
     Array.isArray(person.familyGroupMembers) ? person.familyGroupMembers.join(" ") : "",
   ].filter(Boolean).join(" "));
 }
 
-function buildPages(list) {
-  const size = pageSize();
-  const pages = [];
+function makeDisplayGroups(list) {
   const visited = new Set();
   const groups = [];
 
   list.forEach((person) => {
     if (visited.has(person.id)) return;
+
     if (person.familyGroupId) {
       const group = list.filter((candidate) => candidate.familyGroupId === person.familyGroupId);
       group.forEach((member) => visited.add(member.id));
       groups.push(group);
-    } else {
-      visited.add(person.id);
-      groups.push([person]);
+      return;
     }
+
+    visited.add(person.id);
+    groups.push([person]);
   });
 
+  return groups;
+}
+
+function buildPages(list) {
+  const size = pageSize();
+  const pages = [];
   let page = [];
-  groups.forEach((group) => {
+
+  makeDisplayGroups(list).forEach((group) => {
     if (group.length > size) {
       if (page.length) pages.push(page);
       for (let i = 0; i < group.length; i += size) pages.push(group.slice(i, i + size));
       page = [];
       return;
     }
+
     if (page.length && page.length + group.length > size) {
       pages.push(page);
       page = [];
     }
+
     page.push(...group);
   });
+
   if (page.length) pages.push(page);
   return pages;
+}
+
+function validateEqualRotation() {
+  const counts = new Map(state.filtered.map((person) => [person.id, 0]));
+  state.pages.flat().forEach((person) => counts.set(person.id, (counts.get(person.id) || 0) + 1));
+  const missing = [...counts.entries()].filter(([, count]) => count !== 1);
+  if (missing.length) {
+    console.warn("Rotation validation found repeated/missing people", missing);
+  }
 }
 
 function updatePathProgress() {
@@ -305,15 +343,45 @@ function updatePauseButton() {
   );
 }
 
+function updateControls() {
+  const disabled = state.pages.length <= 1;
+  [els.prev, els.next, els.pause].forEach((button) => {
+    if (!button) return;
+    button.disabled = disabled;
+    button.setAttribute("aria-disabled", String(disabled));
+  });
+  updatePauseButton();
+}
+
 function stopTimer() {
-  clearTimeout(state.timer);
+  window.clearTimeout(state.timer);
   state.timer = null;
+}
+
+function shouldAutoRotate() {
+  return !state.paused && !state.modalPersonId && state.pages.length > 1 && !String(els.search?.value || "").trim() && !document.hidden;
 }
 
 function startTimer() {
   stopTimer();
-  if (state.paused || state.modalPersonId || state.pages.length <= 1 || els.search.value.trim()) return;
+  if (!shouldAutoRotate()) return;
   state.timer = window.setTimeout(() => showPage(state.pageIndex + 1), ROTATE_MS);
+}
+
+function preloadPeople(people) {
+  people.forEach((person) => {
+    const { src } = getPhotoSources(person);
+    if (!src) return;
+    const img = new Image();
+    img.decoding = "async";
+    img.src = src;
+  });
+}
+
+function preloadNextPage() {
+  if (state.pages.length <= 1) return;
+  const nextPage = state.pages[(state.pageIndex + 1) % state.pages.length] || [];
+  preloadPeople(nextPage);
 }
 
 function showEmptyState() {
@@ -321,7 +389,7 @@ function showEmptyState() {
     el("div", { class: "empty-state" },
       el("div", {},
         el("h2", { text: "לא נמצאו תוצאות" }),
-        el("p", { text: "אפשר לחפש שם פרטי, שם משפחה או יישוב." })
+        el("p", { text: "אפשר לחפש שם פרטי או שם משפחה." })
       )
     )
   );
@@ -367,27 +435,41 @@ function renderPersonNode(person, index) {
 
 function renderCurrentPage({ instant = false } = {}) {
   stopTimer();
+  const token = ++state.renderToken;
   const page = state.pages[state.pageIndex] || [];
+
   if (!state.filtered.length || !page.length) {
     showEmptyState();
     updatePathProgress();
+    updateControls();
     return;
   }
 
   const oldNodes = Array.from(els.layer.querySelectorAll(".person-node"));
-  oldNodes.forEach((node) => node.classList.add("is-leaving"));
+  oldNodes.forEach((node) => {
+    node.classList.remove("is-visible");
+    node.classList.add("is-leaving");
+    node.setAttribute("aria-hidden", "true");
+  });
+
+  const delayBeforeReplace = instant || state.reducedMotion || !oldNodes.length ? 0 : FADE_MS;
 
   window.setTimeout(() => {
+    if (token !== state.renderToken) return;
+
     els.layer.replaceChildren();
     page.forEach((person, index) => {
       const node = renderPersonNode(person, index);
       els.layer.append(node);
-      const delay = instant ? 0 : 90 + index * 75;
+      const delay = instant || state.reducedMotion ? 0 : 90 + index * 75;
       requestAnimationFrame(() => window.setTimeout(() => node.classList.add("is-visible"), delay));
     });
+
     updatePathProgress();
+    updateControls();
+    preloadNextPage();
     startTimer();
-  }, instant || !oldNodes.length ? 0 : FADE_MS);
+  }, delayBeforeReplace);
 }
 
 function showPage(index, options = {}) {
@@ -396,15 +478,42 @@ function showPage(index, options = {}) {
   renderCurrentPage(options);
 }
 
+function rebuildPages({ keepCurrentPerson = false, instant = true } = {}) {
+  const currentPersonId = keepCurrentPerson ? (state.pages[state.pageIndex] || [])[0]?.id : null;
+  state.pages = buildPages(state.filtered);
+  validateEqualRotation();
+
+  if (currentPersonId) {
+    const nextIndex = state.pages.findIndex((page) => page.some((person) => person.id === currentPersonId));
+    state.pageIndex = Math.max(0, nextIndex);
+  } else {
+    state.pageIndex = Math.min(state.pageIndex, Math.max(0, state.pages.length - 1));
+  }
+
+  renderCurrentPage({ instant });
+}
+
 function applySearch() {
-  const query = cleanKey(els.search.value || "");
+  const query = cleanKey(els.search?.value || "");
   const tokens = query.split(/\s+/u).filter(Boolean);
+
   state.filtered = tokens.length
     ? state.people.filter((person) => tokens.every((token) => searchText(person).includes(token)))
     : [...state.people];
-  state.pages = buildPages(state.filtered);
+
   state.pageIndex = 0;
-  renderCurrentPage({ instant: true });
+  rebuildPages({ instant: true });
+}
+
+function getFocusableElements(root) {
+  return Array.from(root.querySelectorAll([
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    "[tabindex]:not([tabindex='-1'])",
+  ].join(","))).filter((node) => node instanceof HTMLElement && !node.hasAttribute("hidden"));
 }
 
 function closeStory() {
@@ -413,22 +522,61 @@ function closeStory() {
   document.documentElement.classList.remove("story-is-open");
   document.body.classList.remove("story-is-open");
   document.removeEventListener("keydown", handleModalKeydown, true);
-  if (state.lastFocusedElement?.isConnected) state.lastFocusedElement.focus({ preventScroll: true });
+
+  if (state.lastFocusedElement?.isConnected) {
+    state.lastFocusedElement.focus({ preventScroll: true });
+  }
+
   startTimer();
 }
 
 function handleModalKeydown(event) {
-  if (event.key === "Escape") closeStory();
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeStory();
+    return;
+  }
+
+  if (event.key !== "Tab") return;
+  const panel = els.storyRoot.querySelector(".story-panel");
+  if (!panel) return;
+
+  const focusable = getFocusableElements(panel);
+  if (!focusable.length) {
+    event.preventDefault();
+    panel.focus({ preventScroll: true });
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+  }
 }
 
 function openStory(person) {
   stopTimer();
+  const wasModalOpen = Boolean(state.modalPersonId);
   state.modalPersonId = person.id;
-  state.lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  if (!wasModalOpen) {
+    state.lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
 
   const family = familyMembersWhoDiedWith(person);
   const closeBtn = el("button", { class: "close-story", type: "button", "aria-label": "סגירה", onClick: closeStory }, "×");
-  const panel = el("article", { class: "story-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "story-title", tabindex: "-1" },
+  const panel = el("article", {
+    class: "story-panel",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-labelledby": "story-title",
+    tabindex: "-1",
+  },
     closeBtn,
     el("div", { class: "story-content" },
       el("div", { class: "portrait-frame" }, createPortrait(person, true)),
@@ -452,7 +600,11 @@ function openStory(person) {
     )
   );
 
-  const overlay = el("div", { class: "story-overlay", onClick: (event) => { if (event.target === overlay) closeStory(); } }, panel);
+  const overlay = el("div", {
+    class: "story-overlay",
+    onClick: (event) => { if (event.target === overlay) closeStory(); },
+  }, panel);
+
   els.storyRoot.replaceChildren(overlay);
   document.documentElement.classList.add("story-is-open");
   document.body.classList.add("story-is-open");
@@ -461,13 +613,28 @@ function openStory(person) {
   announce(`${displayName(person)} נפתח`);
 }
 
+function onVisibilityChange() {
+  if (document.hidden) stopTimer();
+  else startTimer();
+}
+
+function onResize() {
+  const mode = pointMode();
+  if (mode === cachedPointMode) return;
+  cachedPointMode = mode;
+  rebuildPages({ keepCurrentPerson: true, instant: true });
+}
+
 function init() {
-  state.people = (window.MEMORIAL_DATA || []).map(normalizePerson);
+  if (!els.layer) return;
+
+  cachedPointMode = pointMode();
+  state.people = Array.isArray(window.MEMORIAL_DATA) ? window.MEMORIAL_DATA.map(normalizePerson) : [];
   nameIndex = buildNameIndex(state.people);
   state.filtered = [...state.people];
-  state.pages = buildPages(state.filtered);
+
   updatePauseButton();
-  renderCurrentPage({ instant: true });
+  rebuildPages({ instant: true });
 
   els.next?.addEventListener("click", () => showPage(state.pageIndex + 1));
   els.prev?.addEventListener("click", () => showPage(state.pageIndex - 1));
@@ -476,17 +643,14 @@ function init() {
     updatePauseButton();
     state.paused ? stopTimer() : startTimer();
   });
+
   els.search?.addEventListener("input", () => {
-    window.clearTimeout(els.search._timer);
-    els.search._timer = window.setTimeout(applySearch, 180);
+    window.clearTimeout(state.searchTimer);
+    state.searchTimer = window.setTimeout(applySearch, SEARCH_DEBOUNCE_MS);
   });
-  window.addEventListener("resize", () => {
-    const previousId = (state.pages[state.pageIndex] || [])[0]?.id;
-    state.pages = buildPages(state.filtered);
-    const nextIndex = Math.max(0, state.pages.findIndex((page) => page.some((person) => person.id === previousId)));
-    state.pageIndex = nextIndex;
-    renderCurrentPage({ instant: true });
-  });
+
+  window.addEventListener("resize", onResize, { passive: true });
+  document.addEventListener("visibilitychange", onVisibilityChange);
 }
 
 init();
