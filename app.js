@@ -143,9 +143,9 @@ function formatDeathDate(person) {
 
 function getPhotoSources(person) {
   const photo = String(person.photo || "").trim();
-  if (!photo) return { src: "", srcset: "" };
-  // Keep the original data path. If the images folder is omitted, the fallback initials appear cleanly.
-  return { src: photo, srcset: "" };
+  if (!photo) return { src: "", fallback: "" };
+  const fallback = photo.replace("images/people-original/", "images/people/").replace(/\.jpg$/i, ".webp");
+  return { src: photo, fallback: fallback !== photo ? fallback : "" };
 }
 
 function createPortrait(person, eager = false) {
@@ -158,8 +158,13 @@ function createPortrait(person, eager = false) {
     loading: eager ? "eager" : "lazy",
     decoding: "async",
   });
-  if (sources.srcset) img.setAttribute("srcset", sources.srcset);
+  let triedFallback = false;
   img.onerror = () => {
+    if (!triedFallback && sources.fallback) {
+      triedFallback = true;
+      img.src = sources.fallback;
+      return;
+    }
     img.onerror = null;
     img.replaceWith(el("span", { class: "portrait-placeholder", text: initials(person), "aria-hidden": "true" }));
   };
@@ -187,6 +192,28 @@ let nameIndex = new Map();
 
 function findPersonByName(name) {
   return nameIndex.get(cleanKey(name)) || null;
+}
+
+
+function familyPhotoSection(person) {
+  const src = String(person.familyGroupPhoto || "").trim();
+  if (!src) return null;
+  const title = person.familyGroupTitle || "תמונה משפחתית";
+  const img = el("img", {
+    class: "family-photo-img",
+    src,
+    alt: title,
+    loading: "lazy",
+    decoding: "async",
+  });
+  img.onerror = () => {
+    const card = img.closest(".family-photo-card");
+    if (card) card.remove();
+  };
+  return el("section", { class: "family-photo-card", "aria-label": title },
+    el("div", { class: "family-photo-frame" }, img),
+    el("p", { class: "family-photo-caption", text: title })
+  );
 }
 
 function familyMembersWhoDiedWith(person) {
@@ -410,6 +437,7 @@ function openStory(person) {
         el("div", { class: "date-card" }, el("span", { text: "תאריך לידה" }), el("strong", { text: formatBirthDate(person) })),
         el("div", { class: "date-card" }, el("span", { text: "תאריך פטירה" }), el("strong", { text: formatDeathDate(person) }))
       ),
+      familyPhotoSection(person),
       family.length ? el("section", { class: "family-links", "aria-label": "בני משפחה שנפלו או נרצחו יחד" },
         el("h3", { text: "בני משפחה שנפלו / נרצחו יחד" }),
         el("div", { class: "family-buttons" },
