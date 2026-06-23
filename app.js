@@ -2,6 +2,7 @@
 
 const PAGE_SIZE = 8;
 const ROTATE_MS = 11000;
+// v10.4: timers are managed centrally to prevent stale hover/click/rotation callbacks.
 const AUTO_HIGHLIGHT_AFTER_CHANGE_MS = 4200;
 const CANDLE_KEY = "memorial-final-candles-v1";
 
@@ -57,6 +58,10 @@ const state = {
   isOpeningStory: false,
   clickGuardTimer: null,
   captureClickTimer: null,
+  openingResetTimer: null,
+  enterTimers: [],
+  storyScrollTimers: [],
+  transitionToken: 0,
   interactionGuardUntil: 0,
   lastFocusedElement: null,
   storyKeydownHandler: null,
@@ -73,6 +78,64 @@ const els = {
   announcer: document.getElementById("sr-announcer"),
   pathFill: document.getElementById("path-fill"),
 };
+
+const SCALAR_TIMER_KEYS = [
+  "timer",
+  "startDelayTimer",
+  "pendingFocusTimer",
+  "hoverResumeTimer",
+  "hoverIntentTimer",
+  "clickGuardTimer",
+  "captureClickTimer",
+  "openingResetTimer",
+];
+
+function clearManagedTimer(key) {
+  if (state[key]) window.clearTimeout(state[key]);
+  state[key] = null;
+}
+
+function registerManagedTimer(key, timerId) {
+  clearManagedTimer(key);
+  state[key] = timerId;
+  return timerId;
+}
+
+function clearTimerList(key) {
+  const timers = Array.isArray(state[key]) ? state[key] : [];
+  timers.forEach((timerId) => window.clearTimeout(timerId));
+  state[key] = [];
+}
+
+function registerListTimer(key, timerId) {
+  if (!Array.isArray(state[key])) state[key] = [];
+  state[key].push(timerId);
+  return timerId;
+}
+
+function clearInteractionTimers() {
+  [
+    "pendingFocusTimer",
+    "hoverResumeTimer",
+    "hoverIntentTimer",
+    "clickGuardTimer",
+    "captureClickTimer",
+    "openingResetTimer",
+  ].forEach(clearManagedTimer);
+  state.hoverIntentPersonId = null;
+}
+
+function clearAllActiveTimers({ invalidateTransitions = true } = {}) {
+  SCALAR_TIMER_KEYS.forEach(clearManagedTimer);
+  clearTimerList("enterTimers");
+  clearTimerList("storyScrollTimers");
+  state.hoverIntentPersonId = null;
+
+  if (invalidateTransitions) {
+    state.transitionToken += 1;
+    state.isTransitioning = false;
+  }
+}
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -975,9 +1038,7 @@ function searchHaystack(person) {
 }
 
 function applySearch(query) {
-  clearTimeout(state.hoverIntentTimer);
-  state.hoverIntentTimer = null;
-  state.hoverIntentPersonId = null;
+  clearAllActiveTimers();
   clearFocusMode(true);
   state.isPointerHovering = false;
   state.isOpeningStory = false;
@@ -1119,7 +1180,7 @@ function showPage(pageIndex, options = {}) {
   if (state.openPersonId || state.isOpeningStory) return;
   if (Date.now() < state.interactionGuardUntil) return;
 
-  stopTimer();
+  clearAllActiveTimers({ invalidateTransitions: false });
 
   const nextIndex = (pageIndex + state.pages.length) % state.pages.length;
   const nextPage = state.pages[nextIndex] || [];
@@ -1134,6 +1195,7 @@ function showPage(pageIndex, options = {}) {
 
   state.pageIndex = nextIndex;
   state.isTransitioning = true;
+  const transitionToken = ++state.transitionToken;
 
   const oldNodes = Array.from(els.layer.querySelectorAll(".person-node:not(.is-leaving)"));
   oldNodes.forEach((node) => {
@@ -1143,6 +1205,7 @@ function showPage(pageIndex, options = {}) {
   });
 
   const renderNext = () => {
+    if (transitionToken !== state.transitionToken || state.openPersonId || state.isOpeningStory) return;
     setVisibleFromPage(nextPage);
     renderAllVisible({ initial: false });
     state.isTransitioning = false;
@@ -1195,6 +1258,7 @@ function markNodeEntering(node) {
 }
 
 function renderAllVisible(options = {}) {
+  clearTimerList("enterTimers");
   els.layer.replaceChildren();
 
   if (!state.filtered.length || !state.visible.length) {
@@ -1212,10 +1276,10 @@ function renderAllVisible(options = {}) {
 
     const delay = options.initial ? index * 75 : 90 + index * 45;
     requestAnimationFrame(() => {
-      setTimeout(() => {
+      registerListTimer("enterTimers", window.setTimeout(() => {
         node.classList.add("is-visible");
         markNodeEntering(node);
-      }, delay);
+      }, delay));
     });
   });
 
@@ -1248,21 +1312,20 @@ function openPersonFromPointer(event) {
 }
 
 function pauseRotationForInteraction() {
-  clearTimeout(state.hoverResumeTimer);
-  state.hoverResumeTimer = null;
+  clearManagedTimer("hoverResumeTimer");
   stopTimer();
 }
 
 function resumeRotationAfterInteraction(delay = 900) {
-  clearTimeout(state.hoverResumeTimer);
+  clearManagedTimer("hoverResumeTimer");
   if (state.paused || state.openPersonId || state.focusLocked || state.isPointerHovering) return;
 
-  state.hoverResumeTimer = window.setTimeout(() => {
-    state.hoverResumeTimer = null;
+  registerManagedTimer("hoverResumeTimer", window.setTimeout(() => {
+    clearManagedTimer("hoverResumeTimer");
     if (!state.paused && !state.openPersonId && !state.focusLocked && !state.isPointerHovering) {
       startTimer();
     }
-  }, delay);
+  }, delay));
 }
 
 function handlePersonHover(person) {
@@ -1273,8 +1336,7 @@ function handlePersonHover(person) {
 }
 
 function handlePersonLeave(person = null) {
-  clearTimeout(state.hoverIntentTimer);
-  state.hoverIntentTimer = null;
+  clearManagedTimer("hoverIntentTimer");
   state.hoverIntentPersonId = null;
 
   // If the pointer only passed over quickly, do nothing. This prevents dim/highlight strobing.
@@ -1300,16 +1362,16 @@ function handlePersonPress(person, event = null) {
   state.isPointerHovering = false;
   state.isTransitioning = false;
   state.interactionGuardUntil = Date.now() + 2400;
-  clearTimeout(state.clickGuardTimer);
-  clearTimeout(state.captureClickTimer);
+  clearInteractionTimers();
   pauseRotationForInteraction();
 
   // Open exact visible person. No search/page refresh happens here.
   openStory(person);
 
-  state.clickGuardTimer = window.setTimeout(() => {
+  registerManagedTimer("clickGuardTimer", window.setTimeout(() => {
     state.isOpeningStory = false;
-  }, 700);
+    clearManagedTimer("clickGuardTimer");
+  }, 700));
 }
 
 function renderPersonNode(person, index) {
@@ -1340,35 +1402,34 @@ function renderPersonNode(person, index) {
     "aria-label": `פתיחת הסיפור של ${formatDisplayName(person.name)}`,
     onPointerEnter: (event) => {
       if (event.pointerType === "mouse" || event.pointerType === "pen") {
-        clearTimeout(state.hoverIntentTimer);
+        clearManagedTimer("hoverIntentTimer");
         state.hoverIntentPersonId = person.id;
-        state.hoverIntentTimer = window.setTimeout(() => {
+        registerManagedTimer("hoverIntentTimer", window.setTimeout(() => {
           if (state.hoverIntentPersonId === person.id && !state.openPersonId && !state.isOpeningStory) {
             handlePersonHover(person);
           }
-        }, 85);
+        }, 85));
       }
     },
     onPointerLeave: (event) => {
       if (event.pointerType === "mouse" || event.pointerType === "pen") {
-        clearTimeout(state.hoverIntentTimer);
-        state.hoverIntentTimer = null;
+        clearManagedTimer("hoverIntentTimer");
         handlePersonLeave(person);
       }
     },
     onFocus: () => {
-      clearTimeout(state.hoverIntentTimer);
+      clearManagedTimer("hoverIntentTimer");
       pauseRotationForInteraction();
       focusPerson(person, false, "keyboard");
     },
     onBlur: () => {
-      clearTimeout(state.hoverIntentTimer);
+      clearManagedTimer("hoverIntentTimer");
       if (state.openPersonId || state.focusLocked || state.isOpeningStory) return;
       clearFocusMode();
       resumeRotationAfterInteraction(1050);
     },
     onPointerDown: () => {
-      clearTimeout(state.hoverIntentTimer);
+      clearManagedTimer("hoverIntentTimer");
       button.classList.add("is-pressed");
     },
     onPointerUp: () => {
@@ -1401,12 +1462,12 @@ function renderPersonNode(person, index) {
 }
 
 function scheduleFocusAfterFade(person) {
-  clearTimeout(state.pendingFocusTimer);
-  state.pendingFocusTimer = window.setTimeout(() => {
+  registerManagedTimer("pendingFocusTimer", window.setTimeout(() => {
+    clearManagedTimer("pendingFocusTimer");
     if (!person || state.openPersonId || state.focusLocked) return;
     if (els.layer?.querySelector(".person-node.is-entering, .person-node.is-leaving")) return;
     focusPerson(person, false, "auto");
-  }, 1200);
+  }, 1200));
 }
 
 function nextPersonForSequence() {
@@ -1641,11 +1702,12 @@ function personPageUrl(person) {
 
 function navigateToPerson(person, event = null) {
   if (!person) return;
+  const resolved = state.people.find((item) => item.id === person.id) || person;
   if (event) {
     event.preventDefault();
     event.stopPropagation();
   }
-  openStory(person);
+  openStory(resolved);
 }
 
 function relatedFamilyTargets(person) {
@@ -1729,6 +1791,7 @@ function createInlinePersonLink(target, text) {
   return el("a", {
     class: "inline-person-link",
     href: personPageUrl(target),
+    dataset: { personId: target.id },
     onClick: (event) => navigateToPerson(target, event),
   }, text);
 }
@@ -1785,6 +1848,7 @@ function createFamilyMemberLink(memberName, contextPerson) {
   return el("a", {
     class: "family-group-member-link inline-person-link",
     href: personPageUrl(target),
+    dataset: { personId: target.id },
     onClick: (event) => navigateToPerson(target, event),
   }, memberName);
 }
@@ -1793,10 +1857,8 @@ function storyParagraphNode(paragraph, index, person = null) {
   const cleaned = cleanStoryParagraph(paragraph);
   if (!cleaned) return null;
 
-  // Keep the story as one readable paragraph. No generic labels, no split rows.
-  return el("p", { class: `story-paragraph story-paragraph-${index + 1}` },
-    ...createLinkedTextNodes(cleaned, person)
-  );
+  // Keep story text plain: family links are intentionally shown only in the family-photo section.
+  return el("p", { class: `story-paragraph story-paragraph-${index + 1}`, text: cleaned });
 }
 
 function compactRelativesText(person) {
@@ -1868,7 +1930,7 @@ function relativesSection(person) {
 
   return el("section", { class: "relatives-card relatives-card-list relatives-card-no-title", "aria-label": `קשרי משפחה של ${formatDisplayName(person.name)}` },
     el("div", { class: "relatives-list" },
-      lines.map((line) => el("p", { class: "relative-line" }, ...createLinkedTextNodes(line, person)))
+      lines.map((line) => el("p", { class: "relative-line", text: line }))
     )
   );
 }
@@ -2097,6 +2159,7 @@ function storyDetails(person) {
 function openStory(person) {
   if (!person) return;
 
+  clearAllActiveTimers();
   state.lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   state.isOpeningStory = true;
   state.interactionGuardUntil = Date.now() + 2400;
@@ -2111,12 +2174,14 @@ function openStory(person) {
   focusPerson(person, true, "open");
   announce(`${formatDisplayName(person.name)}. ${person.storySummary || "סיפור אישי נפתח."}`);
 
-  window.setTimeout(() => {
+  registerManagedTimer("openingResetTimer", window.setTimeout(() => {
     state.isOpeningStory = false;
-  }, 250);
+    clearManagedTimer("openingResetTimer");
+  }, 250));
 }
 
 function closeStory() {
+  clearAllActiveTimers();
   state.openPersonId = null;
   state.isOpeningStory = false;
   state.interactionGuardUntil = Date.now() + 650;
@@ -2132,6 +2197,7 @@ function closeStory() {
 }
 
 function renderStory(person) {
+  clearTimerList("storyScrollTimers");
   deactivateStoryAccessibility({ restoreFocus: false });
 
   let paragraphs = storyParagraphs(person);
@@ -2164,7 +2230,6 @@ function renderStory(person) {
   );
 
   const heroCopy = el("div", { class: "story-heading-v39" },
-    el("span", { class: "story-kicker-v39", text: "סיפור חיים וזיכרון" }),
     el("h2", { id: "story-title", text: formatDisplayName(person.name) }),
     el("div", { class: "story-meta story-meta-v39" },
       metaItems.map((item) => el("span", { text: item }))
@@ -2189,6 +2254,13 @@ function renderStory(person) {
     familyGroupSection(person)
   );
 
+  requestAnimationFrame(() => {
+    try {
+      overlay.scrollTop = 0;
+      panel.scrollTop = 0;
+    } catch (_) {}
+  });
+
   overlay.addEventListener("click", (event) => {
     if (event.target === overlay) closeStory();
   });
@@ -2196,6 +2268,17 @@ function renderStory(person) {
   overlay.append(panel);
   els.storyRoot.replaceChildren(overlay);
   activateStoryAccessibility(panel);
+
+  const resetStoryScroll = () => {
+    try {
+      overlay.scrollTop = 0;
+      panel.scrollTop = 0;
+    } catch (_) {}
+  };
+  resetStoryScroll();
+  requestAnimationFrame(resetStoryScroll);
+  registerListTimer("storyScrollTimers", window.setTimeout(resetStoryScroll, 80));
+  registerListTimer("storyScrollTimers", window.setTimeout(resetStoryScroll, 260));
 }
 
 function syncStoryFromQuery() {
@@ -2204,6 +2287,7 @@ function syncStoryFromQuery() {
 
   const person = state.people.find((item) => item.id === id);
   if (person && state.openPersonId !== id) {
+    clearAllActiveTimers();
     state.openPersonId = person.id;
     renderStory(person);
     focusPerson(person, true, "open");
@@ -2211,37 +2295,33 @@ function syncStoryFromQuery() {
 }
 
 function startTimer() {
-  stopTimer();
+  clearManagedTimer("timer");
 
   if (state.query || state.paused || state.openPersonId || state.isOpeningStory || state.focusLocked || state.isPointerHovering || state.isTransitioning) return;
 
-  state.timer = window.setTimeout(function tick() {
+  registerManagedTimer("timer", window.setTimeout(function tick() {
     if (!state.query && !state.paused && !state.openPersonId && !state.isOpeningStory && !state.focusLocked && !state.isPointerHovering && !state.isTransitioning) {
       nextPage(1);
     }
 
     if (!state.query && !state.paused && !state.openPersonId && !state.isOpeningStory && !state.focusLocked && !state.isPointerHovering && !state.isTransitioning) {
-      state.timer = window.setTimeout(tick, ROTATE_MS);
+      registerManagedTimer("timer", window.setTimeout(tick, ROTATE_MS));
     }
-  }, ROTATE_MS);
+  }, ROTATE_MS));
 }
 
 function stopTimer() {
-  clearTimeout(state.timer);
-  clearTimeout(state.startDelayTimer);
-  clearTimeout(state.pendingFocusTimer);
-  clearTimeout(state.hoverResumeTimer);
-  clearTimeout(state.hoverIntentTimer);
-  clearTimeout(state.clickGuardTimer);
-  clearTimeout(state.captureClickTimer);
-  state.timer = null;
-  state.startDelayTimer = null;
-  state.pendingFocusTimer = null;
-  state.hoverResumeTimer = null;
-  state.hoverIntentTimer = null;
+  [
+    "timer",
+    "startDelayTimer",
+    "pendingFocusTimer",
+    "hoverResumeTimer",
+    "hoverIntentTimer",
+    "clickGuardTimer",
+    "captureClickTimer",
+    "openingResetTimer",
+  ].forEach(clearManagedTimer);
   state.hoverIntentPersonId = null;
-  state.clickGuardTimer = null;
-  state.captureClickTimer = null;
 }
 
 async function loadData() {
@@ -2286,6 +2366,7 @@ function initEvents() {
   });
 
   window.addEventListener("resize", debounce(() => {
+    clearAllActiveTimers();
     initializeVisible();
     renderAllVisible({ initial: true });
     startTimer();
