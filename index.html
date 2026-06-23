@@ -5,12 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="שביל זיכרון — אתר הנצחה אישי עם קו פעימות לב, דיוקנאות וסיפורי חיים." />
   <meta name="theme-color" content="#06131f" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>רקמה אנושית אחת חיה</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=v10-4-maintenance" />
+  <link rel="stylesheet" href="styles.css?v=v10-5-cache-clear-20260623-1015" />
 </head>
 
 <body>
@@ -94,7 +97,29 @@
   <noscript>
     <div class="noscript-message">האתר דורש JavaScript כדי להציג את שביל הזיכרון והחיפוש.</div>
   </noscript>
-  <script src="data.js?v=v10-4-maintenance"></script>
-  <script src="app.js?v=v10-4-maintenance"></script>
+  <script>
+    window.MEMORIAL_BUILD_VERSION = "v10-5-cache-clear-20260623-1015";
+    // Helps when an older PWA/service-worker version was opened in the same browser.
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        var basePath = location.pathname.replace(/\/[^/]*$/, "/");
+        registrations.forEach(function(registration) {
+          try {
+            var scopePath = new URL(registration.scope).pathname;
+            if (basePath.indexOf(scopePath) === 0 || scopePath.indexOf(basePath) === 0) registration.unregister();
+          } catch (_) {}
+        });
+      }).catch(function() {});
+    }
+    if ("caches" in window) {
+      caches.keys().then(function(keys) {
+        keys.forEach(function(key) {
+          if (/fallen|memorial|sng710|memory/i.test(key)) caches.delete(key);
+        });
+      }).catch(function() {});
+    }
+  </script>
+  <script src="data.js?v=v10-5-cache-clear-20260623-1015"></script>
+  <script src="app.js?v=v10-5-cache-clear-20260623-1015"></script>
 </body>
 </html>

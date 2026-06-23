@@ -2330,7 +2330,8 @@ async function loadData() {
   }
 
   try {
-    const response = await fetch("data.json", { cache: "no-store" });
+    const version = encodeURIComponent(window.MEMORIAL_BUILD_VERSION || "v10-5-cache-clear");
+    const response = await fetch(`data.json?v=${version}&_=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   } catch {
