@@ -65,10 +65,9 @@ window.MEMORIAL_DATA = [
     "id": "person-054",
     "photo": "images/people-original/person-054.jpg",
     "gender": "male",
-    "relativesText": "בנם של דינה ויואל; בן זוגה של אורית; אביהם של לירן, נטע-לי, ליאור וגלי",
+    "relativesText": "בנם של דינה ויואל; אביהם של לירן, נטע-לי, ליאור וגלי",
     "relativesLines": [
       "בנם של דינה ויואל",
-      "בן זוגה של אורית",
       "אביהם של לירן, נטע-לי, ליאור וגלי"
     ],
     "excelDisplayName": "עומר צדיקביץ'",
@@ -77,7 +76,7 @@ window.MEMORIAL_DATA = [
     "children": "לירן, נטע-לי, ליאור וגלי",
     "familyMembers": {
       "parents": "דינה ויואל",
-      "spouse": "אורית",
+      "spouse": "",
       "siblings": "",
       "children": "לירן, נטע-לי, ליאור וגלי",
       "grandparents": ""
@@ -89,7 +88,7 @@ window.MEMORIAL_DATA = [
     "candleParentLine": "בן דינה ויואל",
     "candleDatesLine": "נולד: ד' באדר ב' תשל\"ד | נפל: כ\"ב בתשרי תשפ\"ד",
     "candleMemoryLine": "האור, הטוב והאהבה של עומר ימשיכו להאיר בלב אוהביו לנצח.",
-    "spouse": "אורית"
+    "spouse": ""
   },
   {
     "name": "קוץ אביב ז\"ל",

@@ -19,3 +19,9 @@
 בגיטהאב מומלץ להעלות את כל הקבצים יחד: index.html, styles.css, app.js, data.js, data.json.
 אם עדיין רואים גרסה ישנה אחרי ההעלאה: לפתוח פעם אחת עם פרמטר רענון, למשל ?refresh=v10-5, או לבצע Ctrl+F5 / Ctrl+Shift+R.
 העמוד כולל גם ניקוי עדין ל-service worker/cache ישן אם היה אחד בדפדפן.
+
+
+V10.6 updates:
+- Compact story popup to remove the large empty areas, especially for cards without a family-photo section.
+- Omer: removed “בן זוגה של אורית” from the family/left section; Orith remains only in the description as requested.
+- Added a new cache-busting build string: v10-6-compact-20260623-1325.

@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=v10-5-cache-clear-20260623-1015" />
+  <link rel="stylesheet" href="styles.css?v=v10-6-compact-20260623-1325" />
 </head>
 
 <body>
@@ -98,7 +98,9 @@
     <div class="noscript-message">האתר דורש JavaScript כדי להציג את שביל הזיכרון והחיפוש.</div>
   </noscript>
   <script>
-    window.MEMORIAL_BUILD_VERSION = "v10-5-cache-clear-20260623-1015";
+    window.MEMORIAL_BUILD_VERSION = "v10-6-compact-20260623-1325";
+    try { if ("scrollRestoration" in history) history.scrollRestoration = "manual"; } catch (_) {}
+
     // Helps when an older PWA/service-worker version was opened in the same browser.
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
@@ -119,7 +121,7 @@
       }).catch(function() {});
     }
   </script>
-  <script src="data.js?v=v10-5-cache-clear-20260623-1015"></script>
-  <script src="app.js?v=v10-5-cache-clear-20260623-1015"></script>
+  <script src="data.js?v=v10-6-compact-20260623-1325"></script>
+  <script src="app.js?v=v10-6-compact-20260623-1325"></script>
 </body>
 </html>

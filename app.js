@@ -2247,11 +2247,15 @@ function renderStory(person) {
     ? el("aside", { class: "story-side-v39", "aria-label": "פרטים וקשרי משפחה" }, sideItems)
     : null;
 
-  const panel = el("article", { class: "story-panel story-panel-v39", tabindex: "-1" },
+  const familyGroup = familyGroupSection(person);
+  const panel = el("article", {
+    class: `story-panel story-panel-v39 ${familyGroup ? "story-panel-has-family" : "story-panel-no-family"}`,
+    tabindex: "-1"
+  },
     closeBtn,
     el("div", { class: "story-hero-v39" }, heroPhoto, heroCopy),
     el("div", { class: "story-body-v39" }, storyMain, sidePanel),
-    familyGroupSection(person)
+    familyGroup
   );
 
   requestAnimationFrame(() => {
@@ -2268,11 +2272,16 @@ function renderStory(person) {
   overlay.append(panel);
   els.storyRoot.replaceChildren(overlay);
   activateStoryAccessibility(panel);
+  try { panel.focus({ preventScroll: true }); } catch (_) {}
 
   const resetStoryScroll = () => {
     try {
       overlay.scrollTop = 0;
       panel.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      panel.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      overlay.scrollTo({ top: 0, left: 0, behavior: "auto" });
     } catch (_) {}
   };
   resetStoryScroll();
@@ -2330,7 +2339,7 @@ async function loadData() {
   }
 
   try {
-    const version = encodeURIComponent(window.MEMORIAL_BUILD_VERSION || "v10-5-cache-clear");
+    const version = encodeURIComponent(window.MEMORIAL_BUILD_VERSION || "v10-6-compact");
     const response = await fetch(`data.json?v=${version}&_=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
