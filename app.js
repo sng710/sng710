@@ -19,12 +19,13 @@ const DESKTOP_POINTS = [
 ];
 
 const MOBILE_POINTS = [
-  { x: 18, y: 53.0, side: "top", size: .58 },
-  { x: 18, y: 75.0, side: "bottom", size: .54 },
-  { x: 50, y: 53.0, side: "top", size: .58 },
-  { x: 50, y: 75.0, side: "bottom", size: .54 },
-  { x: 82, y: 53.0, side: "top", size: .58 },
-  { x: 82, y: 75.0, side: "bottom", size: .54 },
+  // Safe mobile slots: kept below the poem and above the fixed bottom controls.
+  { x: 18, y: 49.8, side: "top", size: .58 },
+  { x: 18, y: 68.6, side: "bottom", size: .54 },
+  { x: 50, y: 49.8, side: "top", size: .58 },
+  { x: 50, y: 68.6, side: "bottom", size: .54 },
+  { x: 82, y: 49.8, side: "top", size: .58 },
+  { x: 82, y: 68.6, side: "bottom", size: .54 },
 ];
 
 const state = {
@@ -173,7 +174,13 @@ function debounce(fn, delay = 250) {
 }
 
 function normalizeText(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u0591-\u05C7]/gu, "")
+    .replace(/[׳’`]/gu, "'")
+    .replace(/[״“”]/gu, '"')
+    .trim()
+    .toLowerCase();
 }
 
 function stripMemorialSuffix(name) {
@@ -673,14 +680,37 @@ function lineMentionsCandidate(line, candidate) {
 
 function personMentionsOther(person, other) {
   const lines = relativesLines(person).join(" · ");
-  if (!lines) return false;
-  return firstNameCandidates(other).some((candidate) => lineMentionsCandidate(lines, candidate));
+  if (!lines || !other) return false;
+
+  const otherParts = displayNameParts(other.name).map(cleanPersonKey).filter(Boolean);
+  const otherFullName = cleanPersonKey(formatDisplayName(other.name));
+  const otherSurname = otherParts.length > 1 ? otherParts[otherParts.length - 1] : "";
+  const otherGivenNames = otherParts.length > 1 ? otherParts.slice(0, -1) : otherParts;
+
+  // Exact full-name mention is always a reliable relationship signal.
+  if (otherFullName && lineMentionsCandidate(lines, otherFullName)) return true;
+
+  // First-name-only matching creates false links between unrelated people
+  // with common names. Use it only when the surname is also present, or
+  // when both people share a surname.
+  const personParts = displayNameParts(person.name).map(cleanPersonKey).filter(Boolean);
+  const personSurname = personParts.length > 1 ? personParts[personParts.length - 1] : "";
+  const hasSurnameInLine = Boolean(otherSurname && lineMentionsCandidate(lines, otherSurname));
+  const sameSurname = Boolean(personSurname && otherSurname && personSurname === otherSurname);
+
+  if (!hasSurnameInLine && !sameSurname) return false;
+
+  return otherGivenNames.some((candidate) => lineMentionsCandidate(lines, candidate));
 }
 
 function isDirectFamilyBond(a, b) {
   if (!a || !b || a.id === b.id) return false;
 
   if (a.familyGroupId && b.familyGroupId && a.familyGroupId === b.familyGroupId) return true;
+
+  // Prevent false family links between different curated family groups
+  // when two unrelated people share a first name.
+  if (a.familyGroupId && b.familyGroupId && a.familyGroupId !== b.familyGroupId) return false;
 
   if (personMentionsOther(a, b) || personMentionsOther(b, a)) return true;
 
@@ -879,6 +909,9 @@ function fullSearchText(person) {
     person.burialPlace,
     person.familyGroupTitle,
     Array.isArray(person.relativesLines) ? person.relativesLines.join(" ") : person.relativesText,
+    person.storySummaryClean,
+    person.storySummary,
+    person.candleQuote,
   ];
 
   return cleanOrderText(values.filter(Boolean).join(" "));
@@ -1007,6 +1040,17 @@ function componentForPerson(seed, people, visited) {
 
 function buildVisiblePages() {
   const limit = visibleCount();
+
+  // Mobile has fewer slots. To avoid half-empty screens, keep the
+  // equal cycle strict and let focus/hover bring families together when needed.
+  if (limit <= 6) {
+    const mobilePages = [];
+    for (let i = 0; i < state.filtered.length; i += limit) {
+      mobilePages.push(state.filtered.slice(i, i + limit));
+    }
+    return mobilePages;
+  }
+
   const pages = [];
   const visited = new Set();
 
@@ -1508,9 +1552,42 @@ function relativesLines(person) {
 }
 
 
+function cleanStoryDisplayText(value) {
+  return String(value || "")
+    .replace(/\[cite:[^\]]*\]/gu, "")
+    .replace(/^#{1,6}\s*/gmu, "")
+    .replace(/\*\*/gu, "")
+    .replace(/---+/gu, "\n\n")
+    .replace(/חלון זיכרון אישי, מכבד וקריא[^.\n]*[.]/gu, "")
+    .replace(/הפרטים מוצגים לפי המידע שנמסר[^.\n]*[.]/gu, "")
+    .trim();
+}
+
+function cleanStoryParagraph(paragraph) {
+  let text = String(paragraph || "").replace(/\n+/gu, " ").replace(/\s+/gu, " ").trim();
+
+  if (/^יום הזיכרון\s*[:：]/u.test(text)) return "";
+
+  text = text
+    .replace(/^בכמה מילים\s*[:：]\s*/u, "")
+    .replace(/^האדם שמאחורי השם\s*[:：]\s*/u, "");
+
+  let previous = "";
+  while (previous !== text) {
+    previous = text;
+    text = text
+      .replace(/^(?:הוא|היא)\s+זכור(?:ה)?\s+בזכות[^.!?\n]*?(?:,?\s*ובזכות\s+הדרך\s+שבה\s+נגע(?:ה)?\s+בלב\s+משפחת(?:ו|ה),\s+חברותי(?:ו|ה)\s+וחברי(?:ו|ה)\s+וקהילת(?:ו|ה))?[.!?]?\s*/u, "")
+      .replace(/\s*,?\s*ובזכות\s+הדרך\s+שבה\s+נגע(?:ה)?\s+בלב\s+משפחת(?:ו|ה),\s+חברותי(?:ו|ה)\s+וחברי(?:ו|ה)\s+וקהילת(?:ו|ה)[.!?]?\s*/u, "")
+      .trim();
+  }
+
+  text = text.replace(/\s*יום הזיכרון\s*[:：].*$/u, "").trim();
+  return text.replace(/\s{2,}/gu, " ").replace(/^[\s–—-]+|[\s–—-]+$/gu, "");
+}
+
 function storyText(person) {
-  const clean = String(person.storySummaryClean || "").trim();
-  const original = String(person.storySummary || "").trim();
+  const clean = cleanStoryDisplayText(person.storySummaryClean);
+  const original = cleanStoryDisplayText(person.storySummary);
 
   if (clean) return clean;
   if (original) return original;
@@ -1525,10 +1602,17 @@ function storyParagraphs(person) {
     .replace(/---+/gu, "\n\n")
     .trim();
 
+  const seen = new Set();
   const base = text
     .split(/\n{2,}/u)
-    .map((part) => part.replace(/\n+/gu, " ").replace(/\s+/gu, " ").trim())
-    .filter(Boolean);
+    .map(cleanStoryParagraph)
+    .filter(Boolean)
+    .filter((part) => {
+      const key = part.replace(/\s+/gu, " ");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
   const paragraphs = [];
   base.forEach((part) => {
@@ -1555,8 +1639,14 @@ function storyParagraphs(person) {
 }
 
 function storyParagraphNode(paragraph, index) {
-  const match = String(paragraph || "").match(/^([^:：]{2,28})[:：]\s*(.+)$/u);
-  if (!match) return el("p", { text: paragraph });
+  const cleaned = cleanStoryParagraph(paragraph);
+  if (!cleaned) return null;
+
+  const match = String(cleaned || "").match(/^([^:：]{2,28})[:：]\s*(.+)$/u);
+  const genericLabels = new Set(["בכמה מילים", "האדם שמאחורי השם", "יום הזיכרון"]);
+  if (!match || genericLabels.has(match[1].trim())) {
+    return el("p", { class: `story-paragraph story-paragraph-${index + 1}`, text: cleaned });
+  }
 
   return el("p", { class: `story-paragraph story-paragraph-${index + 1}` },
     el("span", { class: "story-paragraph-label", text: match[1] }),
@@ -1615,8 +1705,7 @@ function relativesSection(person) {
 
   return el("section", { class: "relatives-card relatives-card-grid", "aria-label": `משפחה קרובה של ${formatDisplayName(person.name)}` },
     el("div", { class: "relatives-card-header" },
-      el("span", { class: "relatives-card-kicker", text: "משפחה קרובה" }),
-      el("p", { text: "הפרטים מוצגים לפי המידע שנמסר ונמצא במקורות שזוהו בוודאות לאותו אדם." })
+      el("span", { class: "relatives-card-kicker", text: "משפחה קרובה" })
     ),
     el("div", { class: "relatives-grid" },
       rows.map(([label, value]) =>
@@ -1891,7 +1980,8 @@ function renderStory(person) {
   deactivateStoryAccessibility({ restoreFocus: false });
 
   const lit = CandleStore.isLit(person.id);
-  const paragraphs = storyParagraphs(person);
+  let paragraphs = storyParagraphs(person);
+  if (!paragraphs.length) paragraphs = ["טרם נוסף סיפור מורחב."];
 
   const overlay = el("div", {
     class: "story-overlay story-overlay-v39",
@@ -1934,13 +2024,12 @@ function renderStory(person) {
     el("div", { class: "story-meta story-meta-v39" },
       metaItems.map((item) => el("span", { text: item }))
     ),
-    el("p", { class: "story-lead-v39", text: "חלון זיכרון אישי, מכבד וקריא — עם מקום לאדם, למשפחה, ולמורשת שהשאיר או השאירה אחריו." }),
     el("div", { class: "story-actions story-actions-v39" }, candleBtn)
   );
 
   const storyMain = el("section", { class: "story-main-v39", "aria-label": "תיאור הסיפור" },
     el("div", { class: "story-description story-description-v39" },
-      paragraphs.map((paragraph, index) => storyParagraphNode(paragraph, index))
+      paragraphs.map((paragraph, index) => storyParagraphNode(paragraph, index)).filter(Boolean)
     )
   );
 

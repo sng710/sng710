@@ -5899,3 +5899,154 @@ body.story-is-open {
     transform .92s cubic-bezier(.2,.72,.28,1),
     filter .92s ease !important;
 }
+
+
+/* ==========================================================
+   V9 final cleanup: no generic modal copy + safer responsive stage
+   ========================================================== */
+.story-lead-v39,
+.relatives-card-header p {
+  display: none !important;
+}
+
+.story-actions-v39 {
+  margin-top: .55rem !important;
+}
+
+.story-description-v39 p:empty,
+.story-description-v39 .story-paragraph:empty {
+  display: none !important;
+}
+
+/* Keep the rotating portraits clear of the poem and bottom controls. */
+@media (min-width: 901px) {
+  .timeline-stage {
+    min-height: 100svh !important;
+  }
+
+  .person-node[data-slot-index="0"],
+  .person-node[data-slot-index="2"],
+  .person-node[data-slot-index="4"],
+  .person-node[data-slot-index="6"] {
+    top: clamp(18rem, 48.5vh, calc(100svh - 18.5rem)) !important;
+  }
+
+  .person-node[data-slot-index="1"],
+  .person-node[data-slot-index="3"],
+  .person-node[data-slot-index="5"],
+  .person-node[data-slot-index="7"] {
+    top: clamp(26rem, 72vh, calc(100svh - 8.2rem)) !important;
+  }
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .timeline-stage {
+    min-height: 100svh !important;
+    padding-block: 8.2rem 9.8rem !important;
+  }
+
+  .hero-title.hero-poem {
+    top: max(.8rem, env(safe-area-inset-top)) !important;
+  }
+
+  .heartbeat-svg {
+    top: 60.5svh !important;
+    height: 9.2rem !important;
+  }
+
+  .person-node[data-slot-index="0"],
+  .person-node[data-slot-index="2"],
+  .person-node[data-slot-index="4"] {
+    top: clamp(14.2rem, 49.8svh, calc(100svh - 18.4rem)) !important;
+  }
+
+  .person-node[data-slot-index="1"],
+  .person-node[data-slot-index="3"],
+  .person-node[data-slot-index="5"] {
+    top: clamp(22.4rem, 68.6svh, calc(100svh - 10.6rem)) !important;
+  }
+
+  .top-bar {
+    padding-bottom: max(.75rem, env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (max-width: 900px) and (orientation: portrait) and (max-height: 740px) {
+  .hero-poem .poem-panel {
+    padding: .68rem .72rem .72rem !important;
+  }
+
+  .hero-poem .poem-panel p {
+    font-size: .84rem !important;
+    line-height: 1.22 !important;
+  }
+
+  .person-node {
+    --photo-w: calc(var(--photo-w) * .92) !important;
+    --node-w: calc(var(--node-w) * .92) !important;
+  }
+
+  .person-node[data-slot-index="0"],
+  .person-node[data-slot-index="2"],
+  .person-node[data-slot-index="4"] {
+    top: clamp(12.8rem, 48svh, calc(100svh - 17rem)) !important;
+  }
+
+  .person-node[data-slot-index="1"],
+  .person-node[data-slot-index="3"],
+  .person-node[data-slot-index="5"] {
+    top: clamp(19.8rem, 66svh, calc(100svh - 9.5rem)) !important;
+  }
+}
+
+/* V9.1 mobile controls hard-fix: keep search + buttons at the bottom only. */
+@media (max-width: 900px) and (orientation: portrait) {
+  .top-bar {
+    position: fixed !important;
+    inset-inline: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column-reverse !important;
+    align-items: stretch !important;
+    justify-content: flex-end !important;
+    gap: .48rem !important;
+    padding: .55rem .7rem max(.75rem, env(safe-area-inset-bottom)) !important;
+    background: linear-gradient(0deg, rgba(4,14,25,.94), rgba(4,14,25,.68), transparent) !important;
+    pointer-events: none !important;
+  }
+
+  .top-bar > * {
+    pointer-events: auto !important;
+  }
+
+  .top-bar .controls,
+  .top-bar .search-box,
+  .controls,
+  .search-box {
+    position: static !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  .top-bar .controls,
+  .controls {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: .42rem !important;
+  }
+
+  .top-bar .search-box,
+  .search-box {
+    display: flex !important;
+  }
+}
