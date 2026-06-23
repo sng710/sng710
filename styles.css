@@ -6050,3 +6050,89 @@ body.story-is-open {
     display: flex !important;
   }
 }
+
+/* ==========================================================
+   V10: family links + narrative relatives section
+   ========================================================== */
+.relatives-card-list .relatives-list {
+  display: grid !important;
+  gap: .55rem !important;
+}
+
+.relatives-card-list .relative-line {
+  margin: 0 !important;
+  padding: .74rem .82rem !important;
+  border-radius: 1rem !important;
+  border: 1px solid rgba(144, 223, 255, .13) !important;
+  background: rgba(255, 255, 255, .045) !important;
+  color: rgba(235, 250, 255, .93) !important;
+  font-weight: 650 !important;
+  line-height: 1.75 !important;
+}
+
+.inline-person-link {
+  color: #ffffff !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid rgba(160, 232, 255, .62) !important;
+  box-shadow: inset 0 -0.22em 0 rgba(107, 220, 255, .13) !important;
+  border-radius: .18rem !important;
+  padding-inline: .05rem !important;
+  transition: color .2s ease, box-shadow .2s ease, border-color .2s ease !important;
+}
+
+.inline-person-link:hover,
+.inline-person-link:focus-visible {
+  color: #dff8ff !important;
+  border-bottom-color: rgba(255, 255, 255, .9) !important;
+  box-shadow: inset 0 -0.42em 0 rgba(107, 220, 255, .24), 0 0 18px rgba(108, 220, 255, .13) !important;
+  outline: none !important;
+}
+
+.family-group-members a.family-group-member-link {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.story-description-v39 .inline-person-link {
+  font-weight: 800 !important;
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .relatives-card-list .relative-line {
+    padding: .66rem .72rem !important;
+    font-size: .94rem !important;
+    line-height: 1.68 !important;
+  }
+}
+
+/* V10 responsive safety: keep portraits below the poem and above bottom controls. */
+@media (min-width: 901px) {
+  .person-node[data-slot-index="0"],
+  .person-node[data-slot-index="2"],
+  .person-node[data-slot-index="4"],
+  .person-node[data-slot-index="6"] {
+    top: clamp(17.3rem, 47.8vh, calc(100svh - 19rem)) !important;
+  }
+
+  .person-node[data-slot-index="1"],
+  .person-node[data-slot-index="3"],
+  .person-node[data-slot-index="5"],
+  .person-node[data-slot-index="7"] {
+    top: clamp(25rem, 70.8vh, calc(100svh - 8.9rem)) !important;
+  }
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .person-node[data-slot-index="0"],
+  .person-node[data-slot-index="2"],
+  .person-node[data-slot-index="4"] {
+    top: clamp(13.4rem, 48.6svh, calc(100svh - 18.8rem)) !important;
+  }
+
+  .person-node[data-slot-index="1"],
+  .person-node[data-slot-index="3"],
+  .person-node[data-slot-index="5"] {
+    top: clamp(20.8rem, 66.2svh, calc(100svh - 11.4rem)) !important;
+  }
+}

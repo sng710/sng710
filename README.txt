@@ -1,12 +1,14 @@
-גרסה v9.1 — ניקוי טקסטים גנריים + רוטציה בטוחה
+fallen-memory-v10-code-only
 
-מה עודכן:
-- הוסרו טקסטים גנריים מכל חלונות הזיכרון.
-- הוסרו הכותרות/הסעיפים: "האדם שמאחורי השם" ו-"יום הזיכרון".
-- הסיכומים נוקו כך שיישארו פרטים אישיים בלבד מתוך המידע הקיים, בלי המצאת פרטים חדשים.
-- החיפוש הורחב גם לתקצירי הסיפור ולציטוטים, ונוקו קישורי משפחה שגויים שנבעו משמות פרטיים זהים.
-- רוטציית התמונות נשמרת שוויונית: כל אדם מופיע פעם אחת בכל מחזור מלא.
-- הותאמו נקודות התצוגה כדי שהתמונות לא ייכנסו מתחת לשיר העליון או מתחת לאזור הכפתורים במובייל ובדסקטופ.
+Code-only update. Use this if your GitHub repository already contains the images folder.
 
-להעלאה ל-GitHub:
-אם כבר קיימת תיקיית images באתר — אפשר להעלות רק את קבצי הקוד: index.html, styles.css, app.js, data.js, data.json.
+Updated in this version:
+- Family members who were murdered/fell together are now clickable wherever they appear in the story/family sections.
+- Clicking a family name opens that person directly and updates the URL with ?id=person-xxx.
+- Hover no longer rearranges the rotating cards, preventing the issue where clicking Aviv could open Rotem after the cards moved.
+- Story summaries were shortened and cleaned from generic text/section labels.
+- The “משפחה קרובה” area now appears as readable narrative relationship lines, not separate grid fields.
+- Rotating portraits were kept clear of the top poem and bottom controls on desktop and mobile.
+- Search remains stable and family-aware.
+
+Upload only these code files over the existing repository, without deleting/replacing your images folder.

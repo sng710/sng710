@@ -812,13 +812,9 @@ function focusPerson(person, locked = false, source = "manual") {
   state.focusRelatedIds = relatedIdsFor(person);
   state.focusLocked = Boolean(locked);
 
-  // Only hover/keyboard should rearrange the visible line to show family.
-  // Press/open must keep the clicked card stable and open the popup immediately.
-  if ((source === "hover" || source === "keyboard") && ensureFamilyVisible(person)) {
-    updateFocusClasses();
-    return;
-  }
-
+  // Keep the visible cards stable during hover/click.
+  // Earlier versions rearranged family groups on hover, which could move
+  // the portrait under the cursor and open the wrong person.
   updateFocusClasses();
 }
 
@@ -1638,19 +1634,154 @@ function storyParagraphs(person) {
   return paragraphs.filter(Boolean).slice(0, 12);
 }
 
-function storyParagraphNode(paragraph, index) {
+
+function personPageUrl(person) {
+  return `?id=${encodeURIComponent(person.id)}`;
+}
+
+function navigateToPerson(person, event = null) {
+  if (!person) return;
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  openStory(person);
+}
+
+function relatedFamilyTargets(person) {
+  if (!person?.familyGroupId) return [];
+  return state.people.filter((candidate) =>
+    candidate &&
+    candidate.id !== person.id &&
+    candidate.familyGroupId &&
+    candidate.familyGroupId === person.familyGroupId
+  );
+}
+
+function linkableNameVariants(target) {
+  const parts = displayNameParts(target.name).map((part) => String(part || "").trim()).filter(Boolean);
+  const full = formatDisplayName(target.name);
+  const surname = parts.length > 1 ? parts[parts.length - 1] : "";
+  const given = parts.length > 1 ? parts.slice(0, -1) : parts;
+
+  const variants = [
+    full,
+    given.join(" "),
+    given[0],
+    ...given,
+    ...parts,
+    cleanPersonKey(full),
+    cleanPersonKey(given.join(" ")),
+    cleanPersonKey(given[0]),
+  ];
+
+  // Link surname+given forms too, because the source data sometimes stores names surname-first.
+  if (surname && given.length) variants.push(`${surname} ${given.join(" ")}`);
+
+  // Common spelling variant in the source/reference material.
+  variants.forEach((value) => {
+    if (String(value || "").includes("ליבנת")) variants.push(String(value).replace(/ליבנת/gu, "לבנת"));
+  });
+
+  return [...new Set(variants
+    .map((value) => String(value || "").replace(/\s+/gu, " ").trim())
+    .filter((value) => value.length >= 2)
+  )];
+}
+
+function familyLinkMap(person) {
+  const map = new Map();
+  const targets = relatedFamilyTargets(person);
+  if (!targets.length) return map;
+
+  targets.forEach((target) => {
+    linkableNameVariants(target).forEach((variant) => {
+      map.set(variant, target);
+      if (!variant.startsWith("ו")) map.set(`ו${variant}`, target);
+    });
+  });
+
+  return map;
+}
+
+function createInlinePersonLink(target, text) {
+  return el("a", {
+    class: "inline-person-link",
+    href: personPageUrl(target),
+    onClick: (event) => navigateToPerson(target, event),
+  }, text);
+}
+
+function createLinkedTextNodes(text, contextPerson) {
+  const source = String(text || "");
+  const map = familyLinkMap(contextPerson);
+  if (!source || !map.size) return [document.createTextNode(source)];
+
+  const entries = [...map.entries()]
+    .filter(([label]) => label && label.length >= 2)
+    .sort((a, b) => b[0].length - a[0].length);
+
+  if (!entries.length) return [document.createTextNode(source)];
+
+  const alternatives = entries.map(([label]) => escapeRegex(label)).join("|");
+  const pattern = new RegExp(`(^|[\\s,.;:־\\-()\\[\\]״\"])(` + alternatives + `)(?=$|[\\s,.;:־\\-()\\[\\]״\"])`, "gu");
+
+  const nodes = [];
+  let last = 0;
+  let match;
+
+  while ((match = pattern.exec(source)) !== null) {
+    const prefix = match[1] || "";
+    const label = match[2] || "";
+    const start = match.index + prefix.length;
+    const target = map.get(label);
+
+    if (!target || start < last) continue;
+
+    if (match.index > last) nodes.push(document.createTextNode(source.slice(last, match.index)));
+    if (prefix) nodes.push(document.createTextNode(prefix));
+    nodes.push(createInlinePersonLink(target, label));
+    last = start + label.length;
+  }
+
+  if (last < source.length) nodes.push(document.createTextNode(source.slice(last)));
+  return nodes.length ? nodes : [document.createTextNode(source)];
+}
+
+function createFamilyMemberLink(memberName, contextPerson) {
+  const normalizedMember = cleanPersonKey(memberName);
+  const target = relatedFamilyTargets(contextPerson).find((candidate) => {
+    const targetNames = [
+      cleanPersonKey(formatDisplayName(candidate.name)),
+      cleanPersonKey(candidate.name),
+      ...linkableNameVariants(candidate).map(cleanPersonKey),
+    ];
+    return targetNames.some((value) => value && (value === normalizedMember || normalizedMember.includes(value) || value.includes(normalizedMember)));
+  });
+
+  if (!target) return el("span", { text: memberName });
+  return el("a", {
+    class: "family-group-member-link inline-person-link",
+    href: personPageUrl(target),
+    onClick: (event) => navigateToPerson(target, event),
+  }, memberName);
+}
+
+function storyParagraphNode(paragraph, index, person = null) {
   const cleaned = cleanStoryParagraph(paragraph);
   if (!cleaned) return null;
 
   const match = String(cleaned || "").match(/^([^:：]{2,28})[:：]\s*(.+)$/u);
   const genericLabels = new Set(["בכמה מילים", "האדם שמאחורי השם", "יום הזיכרון"]);
   if (!match || genericLabels.has(match[1].trim())) {
-    return el("p", { class: `story-paragraph story-paragraph-${index + 1}`, text: cleaned });
+    return el("p", { class: `story-paragraph story-paragraph-${index + 1}` },
+      ...createLinkedTextNodes(cleaned, person)
+    );
   }
 
   return el("p", { class: `story-paragraph story-paragraph-${index + 1}` },
     el("span", { class: "story-paragraph-label", text: match[1] }),
-    el("span", { class: "story-paragraph-text", text: match[2] })
+    el("span", { class: "story-paragraph-text" }, ...createLinkedTextNodes(match[2], person))
   );
 }
 
@@ -1699,21 +1830,34 @@ function familyMemberRows(person) {
   });
 }
 
-function relativesSection(person) {
-  const rows = familyMemberRows(person);
-  if (!rows.length) return null;
+function relativesNarrativeLines(person) {
+  const direct = relativesLines(person).map((line) => String(line || "").trim()).filter(Boolean);
+  if (direct.length) return direct;
 
-  return el("section", { class: "relatives-card relatives-card-grid", "aria-label": `משפחה קרובה של ${formatDisplayName(person.name)}` },
+  return familyMemberRows(person)
+    .map(([label, value]) => {
+      const cleanValue = String(value || "").trim();
+      if (!cleanValue) return "";
+      if (label === "הורים") return isFemale(person) ? `בתם של ${cleanValue}` : `בנם של ${cleanValue}`;
+      if (label === "בן/בת זוג") return isFemale(person) ? `אשתו של ${cleanValue}` : `בעלה של ${cleanValue}`;
+      if (label === "ילדים") return isFemale(person) ? `אימם של ${cleanValue}` : `אביהם של ${cleanValue}`;
+      if (label === "אחים") return isFemale(person) ? `אחות ל${cleanValue}` : `אח ל${cleanValue}`;
+      if (label === "סבים/סבתות") return isFemale(person) ? `נכדתם של ${cleanValue}` : `נכדם של ${cleanValue}`;
+      return cleanValue;
+    })
+    .filter(Boolean);
+}
+
+function relativesSection(person) {
+  const lines = relativesNarrativeLines(person);
+  if (!lines.length) return null;
+
+  return el("section", { class: "relatives-card relatives-card-list", "aria-label": `משפחה קרובה של ${formatDisplayName(person.name)}` },
     el("div", { class: "relatives-card-header" },
       el("span", { class: "relatives-card-kicker", text: "משפחה קרובה" })
     ),
-    el("div", { class: "relatives-grid" },
-      rows.map(([label, value]) =>
-        el("div", { class: "relative-pill" },
-          el("span", { class: "relative-label", text: label }),
-          el("strong", { class: "relative-value", text: value })
-        )
-      )
+    el("div", { class: "relatives-list" },
+      lines.map((line) => el("p", { class: "relative-line" }, ...createLinkedTextNodes(line, person)))
     )
   );
 }
@@ -1740,7 +1884,7 @@ function familyGroupSection(person) {
       el("h3", { text: person.familyGroupTitle || "נרצחו יחד" }),
       person.familyGroupNote ? el("p", { text: person.familyGroupNote }) : null,
       members.length ? el("div", { class: "family-group-members" },
-        members.map((member) => el("span", { text: member }))
+        members.map((member) => createFamilyMemberLink(member, person))
       ) : null
     )
   );
@@ -2029,7 +2173,7 @@ function renderStory(person) {
 
   const storyMain = el("section", { class: "story-main-v39", "aria-label": "תיאור הסיפור" },
     el("div", { class: "story-description story-description-v39" },
-      paragraphs.map((paragraph, index) => storyParagraphNode(paragraph, index)).filter(Boolean)
+      paragraphs.map((paragraph, index) => storyParagraphNode(paragraph, index, person)).filter(Boolean)
     )
   );
 
