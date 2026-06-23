@@ -6136,3 +6136,150 @@ body.story-is-open {
     top: clamp(20.8rem, 66.2svh, calc(100svh - 11.4rem)) !important;
   }
 }
+
+
+/* ==========================================================
+   V10.1: requested modal cleanup + exact family linking fixes
+   ========================================================== */
+.story-actions-v39,
+.primary-candle-button-v39,
+.candle-print-card,
+.candle-print-button,
+.candle-label-preview {
+  display: none !important;
+}
+
+.relatives-card-header,
+.relatives-card-kicker {
+  display: none !important;
+}
+
+.story-panel-v39::before {
+  z-index: 0 !important;
+}
+
+.story-panel-v39 > *,
+.story-hero-v39,
+.story-body-v39,
+.story-main-v39,
+.story-side-v39,
+.story-description-v39,
+.story-heading-v39 {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.story-body-v39 {
+  direction: ltr !important;
+  grid-template-columns: minmax(17rem, 23rem) minmax(0, 1fr) !important;
+  align-items: start !important;
+}
+
+.story-side-v39 {
+  grid-column: 1 !important;
+  direction: rtl !important;
+}
+
+.story-main-v39 {
+  grid-column: 2 !important;
+  direction: rtl !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.story-description-v39 {
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.story-description-v39 p,
+.story-description-v39 .story-paragraph {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-align: right !important;
+  direction: rtl !important;
+  unicode-bidi: plaintext !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+  color: #241a10 !important;
+}
+
+.story-description-v39 .story-paragraph-label {
+  display: none !important;
+}
+
+.story-description-v39 .story-paragraph-text {
+  display: inline !important;
+}
+
+.story-panel-v39 .inline-person-link {
+  color: #174c64 !important;
+  font-weight: 850 !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid rgba(23, 76, 100, .44) !important;
+  box-shadow: inset 0 -0.20em 0 rgba(85, 185, 215, .13) !important;
+}
+
+.story-panel-v39 .inline-person-link:hover,
+.story-panel-v39 .inline-person-link:focus-visible {
+  color: #0d2f40 !important;
+  border-bottom-color: rgba(13, 47, 64, .72) !important;
+  box-shadow: inset 0 -0.42em 0 rgba(85, 185, 215, .23), 0 0 18px rgba(85, 185, 215, .15) !important;
+}
+
+.story-side-v39 .relatives-card,
+.story-side-v39 .details-grid,
+.story-panel-v39 > .family-group-card {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.relatives-card-list .relatives-list {
+  gap: .48rem !important;
+}
+
+.relatives-card-list .relative-line {
+  background: rgba(255,255,255,.74) !important;
+  color: #241a10 !important;
+  border-color: rgba(132, 94, 35, .13) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.74), 0 8px 20px rgba(58, 38, 13, .045) !important;
+}
+
+@media (max-width: 900px) {
+  .story-body-v39 {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    direction: rtl !important;
+  }
+
+  .story-main-v39,
+  .story-side-v39 {
+    grid-column: 1 !important;
+  }
+
+  .story-main-v39 { order: 1 !important; }
+  .story-side-v39 { order: 2 !important; }
+}
+
+/* V10.1 final polish: keep names readable in one natural heading line when space allows. */
+.story-heading-v39 h2,
+.story-panel-v39 #story-title {
+  font-size: clamp(2.55rem, 4.8vw, 4.7rem) !important;
+  line-height: 1.04 !important;
+  letter-spacing: -.035em !important;
+  max-width: 100% !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+
+@media (max-width: 900px) {
+  .story-heading-v39 h2,
+  .story-panel-v39 #story-title {
+    font-size: clamp(2.15rem, 10vw, 3.25rem) !important;
+    letter-spacing: -.025em !important;
+  }
+}

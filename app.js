@@ -1663,27 +1663,35 @@ function linkableNameVariants(target) {
   const full = formatDisplayName(target.name);
   const surname = parts.length > 1 ? parts[parts.length - 1] : "";
   const given = parts.length > 1 ? parts.slice(0, -1) : parts;
+  const givenFull = given.join(" ").trim();
+  const sourceOrder = stripMemorialSuffix(target.name);
 
+  // Important: do NOT add the surname alone. In family cards like "קוץ רותם",
+  // a surname-only match ("קוץ") could incorrectly open the first family member.
   const variants = [
     full,
-    given.join(" "),
+    sourceOrder,
+    givenFull,
     given[0],
-    ...given,
-    ...parts,
     cleanPersonKey(full),
-    cleanPersonKey(given.join(" ")),
+    cleanPersonKey(sourceOrder),
+    cleanPersonKey(givenFull),
     cleanPersonKey(given[0]),
   ];
 
   // Link surname+given forms too, because the source data sometimes stores names surname-first.
-  if (surname && given.length) variants.push(`${surname} ${given.join(" ")}`);
+  if (surname && given.length) variants.push(`${surname} ${givenFull}`);
 
   // Common spelling variant in the source/reference material.
+  const withSpellingVariants = [];
   variants.forEach((value) => {
-    if (String(value || "").includes("ליבנת")) variants.push(String(value).replace(/ליבנת/gu, "לבנת"));
+    if (!value) return;
+    withSpellingVariants.push(value);
+    if (String(value).includes("ליבנת")) withSpellingVariants.push(String(value).replace(/ליבנת/gu, "לבנת"));
+    if (String(value).includes("לבנת")) withSpellingVariants.push(String(value).replace(/לבנת/gu, "ליבנת"));
   });
 
-  return [...new Set(variants
+  return [...new Set(withSpellingVariants
     .map((value) => String(value || "").replace(/\s+/gu, " ").trim())
     .filter((value) => value.length >= 2)
   )];
@@ -1691,13 +1699,26 @@ function linkableNameVariants(target) {
 
 function familyLinkMap(person) {
   const map = new Map();
+  const conflicts = new Set();
   const targets = relatedFamilyTargets(person);
   if (!targets.length) return map;
 
+  const addVariant = (variant, target) => {
+    const label = String(variant || "").replace(/\s+/gu, " ").trim();
+    if (label.length < 2 || conflicts.has(label)) return;
+    const existing = map.get(label);
+    if (existing && existing.id !== target.id) {
+      map.delete(label);
+      conflicts.add(label);
+      return;
+    }
+    map.set(label, target);
+  };
+
   targets.forEach((target) => {
     linkableNameVariants(target).forEach((variant) => {
-      map.set(variant, target);
-      if (!variant.startsWith("ו")) map.set(`ו${variant}`, target);
+      addVariant(variant, target);
+      if (!variant.startsWith("ו")) addVariant(`ו${variant}`, target);
     });
   });
 
@@ -1756,7 +1777,8 @@ function createFamilyMemberLink(memberName, contextPerson) {
       cleanPersonKey(candidate.name),
       ...linkableNameVariants(candidate).map(cleanPersonKey),
     ];
-    return targetNames.some((value) => value && (value === normalizedMember || normalizedMember.includes(value) || value.includes(normalizedMember)));
+    // Exact matching only. This prevents "קוץ רותם" from matching "קוץ" on Aviv.
+    return targetNames.some((value) => value && value === normalizedMember);
   });
 
   if (!target) return el("span", { text: memberName });
@@ -1771,17 +1793,9 @@ function storyParagraphNode(paragraph, index, person = null) {
   const cleaned = cleanStoryParagraph(paragraph);
   if (!cleaned) return null;
 
-  const match = String(cleaned || "").match(/^([^:：]{2,28})[:：]\s*(.+)$/u);
-  const genericLabels = new Set(["בכמה מילים", "האדם שמאחורי השם", "יום הזיכרון"]);
-  if (!match || genericLabels.has(match[1].trim())) {
-    return el("p", { class: `story-paragraph story-paragraph-${index + 1}` },
-      ...createLinkedTextNodes(cleaned, person)
-    );
-  }
-
+  // Keep the story as one readable paragraph. No generic labels, no split rows.
   return el("p", { class: `story-paragraph story-paragraph-${index + 1}` },
-    el("span", { class: "story-paragraph-label", text: match[1] }),
-    el("span", { class: "story-paragraph-text" }, ...createLinkedTextNodes(match[2], person))
+    ...createLinkedTextNodes(cleaned, person)
   );
 }
 
@@ -1852,10 +1866,7 @@ function relativesSection(person) {
   const lines = relativesNarrativeLines(person);
   if (!lines.length) return null;
 
-  return el("section", { class: "relatives-card relatives-card-list", "aria-label": `משפחה קרובה של ${formatDisplayName(person.name)}` },
-    el("div", { class: "relatives-card-header" },
-      el("span", { class: "relatives-card-kicker", text: "משפחה קרובה" })
-    ),
+  return el("section", { class: "relatives-card relatives-card-list relatives-card-no-title", "aria-label": `קשרי משפחה של ${formatDisplayName(person.name)}` },
     el("div", { class: "relatives-list" },
       lines.map((line) => el("p", { class: "relative-line" }, ...createLinkedTextNodes(line, person)))
     )
@@ -2123,7 +2134,6 @@ function closeStory() {
 function renderStory(person) {
   deactivateStoryAccessibility({ restoreFocus: false });
 
-  const lit = CandleStore.isLit(person.id);
   let paragraphs = storyParagraphs(person);
   if (!paragraphs.length) paragraphs = ["טרם נוסף סיפור מורחב."];
 
@@ -2140,15 +2150,6 @@ function renderStory(person) {
     "aria-label": "סגירת סיפור",
     onClick: closeStory,
   }, "×");
-
-  const candleBtn = el("button", {
-    type: "button",
-    class: "primary-candle-button-v39",
-    onClick: () => {
-      CandleStore.light(person.id);
-      renderStory(person);
-    },
-  }, lit ? `נר דולק · ${CandleStore.count(person.id)}` : `הדלקת נר · ${CandleStore.count(person.id)}`);
 
   const metaItems = [
     person.community || "יישוב לא צוין",
@@ -2167,8 +2168,7 @@ function renderStory(person) {
     el("h2", { id: "story-title", text: formatDisplayName(person.name) }),
     el("div", { class: "story-meta story-meta-v39" },
       metaItems.map((item) => el("span", { text: item }))
-    ),
-    el("div", { class: "story-actions story-actions-v39" }, candleBtn)
+    )
   );
 
   const storyMain = el("section", { class: "story-main-v39", "aria-label": "תיאור הסיפור" },
@@ -2179,15 +2179,14 @@ function renderStory(person) {
 
   const sideItems = [relativesSection(person), storyDetails(person)].filter(Boolean);
   const sidePanel = sideItems.length
-    ? el("aside", { class: "story-side-v39", "aria-label": "פרטים ומשפחה קרובה" }, sideItems)
+    ? el("aside", { class: "story-side-v39", "aria-label": "פרטים וקשרי משפחה" }, sideItems)
     : null;
 
   const panel = el("article", { class: "story-panel story-panel-v39", tabindex: "-1" },
     closeBtn,
     el("div", { class: "story-hero-v39" }, heroPhoto, heroCopy),
     el("div", { class: "story-body-v39" }, storyMain, sidePanel),
-    familyGroupSection(person),
-    candlePrintSection(person)
+    familyGroupSection(person)
   );
 
   overlay.addEventListener("click", (event) => {
