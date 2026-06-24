@@ -9,26 +9,24 @@ const CANDLE_KEY = "memorial-final-candles-v1";
 const PHOTO_OVERRIDES = {};
 
 const DESKTOP_POINTS = [
-  // V12: balanced woven grid. No heartbeat divider, no overlapping cards.
-  // x is measured from the right edge so the visual order reads naturally RTL.
-  { x: 18, y: 44, side: "top", size: .82 },
-  { x: 38, y: 44, side: "top", size: .82 },
-  { x: 58, y: 44, side: "top", size: .82 },
-  { x: 78, y: 44, side: "top", size: .82 },
-  { x: 18, y: 66, side: "bottom", size: .80 },
-  { x: 38, y: 66, side: "bottom", size: .80 },
-  { x: 58, y: 66, side: "bottom", size: .80 },
-  { x: 78, y: 66, side: "bottom", size: .80 },
+  { x: 16, y: 48.5, side: "top", size: .80 },
+  { x: 28, y: 73.5, side: "bottom", size: .76 },
+  { x: 40, y: 48.5, side: "top", size: .80 },
+  { x: 52, y: 73.5, side: "bottom", size: .76 },
+  { x: 64, y: 48.5, side: "top", size: .80 },
+  { x: 76, y: 73.5, side: "bottom", size: .76 },
+  { x: 88, y: 48.5, side: "top", size: .80 },
+  { x: 8,  y: 73.5, side: "bottom", size: .76 },
 ];
 
 const MOBILE_POINTS = [
-  // V12: clear 2-column/3-row mobile grid with room for names and controls.
-  { x: 28, y: 39, side: "top", size: .62 },
-  { x: 72, y: 39, side: "top", size: .62 },
-  { x: 28, y: 55, side: "bottom", size: .60 },
-  { x: 72, y: 55, side: "bottom", size: .60 },
-  { x: 28, y: 71, side: "top", size: .58 },
-  { x: 72, y: 71, side: "top", size: .58 },
+  // Safe mobile slots: kept below the poem and above the fixed bottom controls.
+  { x: 18, y: 49.8, side: "top", size: .58 },
+  { x: 18, y: 68.6, side: "bottom", size: .54 },
+  { x: 50, y: 49.8, side: "top", size: .58 },
+  { x: 50, y: 68.6, side: "bottom", size: .54 },
+  { x: 82, y: 49.8, side: "top", size: .58 },
+  { x: 82, y: 68.6, side: "bottom", size: .54 },
 ];
 
 const state = {
@@ -1382,13 +1380,8 @@ function renderPersonNode(person, index) {
   const scale = point.size || .9;
 
   const node = el("article", {
-    class: `person-node ${isTop ? "is-top" : "is-bottom"} ${person.familyGroupId ? "has-family-group" : ""}`,
-    dataset: {
-      personId: person.id,
-      slotIndex: String(index),
-      familyGroupId: person.familyGroupId || "",
-      familyGroupTitle: person.familyGroupTitle || ""
-    },
+    class: `person-node ${isTop ? "is-top" : "is-bottom"}`,
+    dataset: { personId: person.id, slotIndex: String(index) },
     style: {
       right: `${point.x}%`,
       left: "auto",
@@ -1461,8 +1454,7 @@ function renderPersonNode(person, index) {
     ),
     el("span", { class: "person-name" },
       ...displayNameParts(person.name).map((part) => el("span", { text: part }))
-    ),
-    el("span", { class: "story-chip", text: "לסיפור" })
+    )
   );
 
   node.append(button);
@@ -2347,7 +2339,7 @@ async function loadData() {
   }
 
   try {
-    const version = encodeURIComponent(window.MEMORIAL_BUILD_VERSION || "v11-woven-color");
+    const version = encodeURIComponent(window.MEMORIAL_BUILD_VERSION || "v10-6-compact");
     const response = await fetch(`data.json?v=${version}&_=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
