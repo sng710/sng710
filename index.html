@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="שביל זיכרון — אתר הנצחה אישי עם קו פעימות לב, דיוקנאות וסיפורי חיים." />
-  <meta name="theme-color" content="#06131f" />
+  <meta name="description" content="רקמה אנושית אחת חיה — אתר הנצחה אישי עם שמות, תמונות וסיפורי חיים בממשק אריג חם, רגיש ונגיש." />
+  <meta name="theme-color" content="#e7dcc9" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -13,19 +13,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=v10-6-compact-20260623-1325" />
+  <link rel="stylesheet" href="styles.css?v=v12-woven-grid-ui-20260624-1615" />
 </head>
 
 <body>
-  <a class="skip-link" href="#memory-stage">דילוג לשביל הזיכרון</a>
+  <a class="skip-link" href="#memory-stage">דילוג לרקמת הזיכרון</a>
   <div id="sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
-  <main id="memory-stage" class="memory-stage" aria-label="שביל זיכרון" tabindex="-1">
+  <main id="memory-stage" class="memory-stage" aria-label="רקמת זיכרון" tabindex="-1">
     <div class="mist" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
 
     <header class="top-bar" aria-label="חיפוש ושליטה">
-      <div class="controls" aria-label="שליטה בציר הזיכרון">
+      <div class="controls" aria-label="שליטה ברקמת הזיכרון">
         <button id="prev-btn" class="ghost-btn" type="button" aria-label="השם הקודם">← הקודם</button>
         <button id="pause-btn" class="ghost-btn" type="button" aria-pressed="false">
           <span class="icon" aria-hidden="true">Ⅱ</span>השהיה
@@ -51,42 +51,8 @@
       </div>
     </section>
 
-    <section class="timeline-stage" aria-label="ציר פעימות הזיכרון">
-      <svg class="heartbeat-svg" viewBox="0 0 1200 360" preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#6bdcff" stop-opacity=".18" />
-            <stop offset="18%" stop-color="#91eaff" stop-opacity=".72" />
-            <stop offset="50%" stop-color="#f2fcff" stop-opacity="1" />
-            <stop offset="82%" stop-color="#91eaff" stop-opacity=".72" />
-            <stop offset="100%" stop-color="#6bdcff" stop-opacity=".18" />
-          </linearGradient>
-          <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#99e7ff" stop-opacity=".28" />
-            <stop offset="50%" stop-color="#e8fbff" stop-opacity=".40" />
-            <stop offset="100%" stop-color="#69cdff" stop-opacity=".24" />
-          </linearGradient>
-          <filter id="lineGlow" x="-12%" y="-90%" width="124%" height="280%">
-            <feGaussianBlur stdDeviation="4" result="blur"/>
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-          <filter id="heartGlow" x="-40%" y="-40%" width="180%" height="200%">
-            <feGaussianBlur stdDeviation="6" result="blur"/>
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-
-        <path class="line-shadow" d="M20 180 L156 180 L174 180 L194 148 L216 216 L238 180 L316 180 L338 180 L362 160 L386 196 L410 180 L506 180 L526 180 L548 158 L570 200 L592 180 L610 180 L628 162 L650 200 L672 180 L790 180 L812 180 L834 158 L856 196 L880 180 L982 180 L1000 180 L1022 148 L1044 216 L1066 180 L1142 180 L1160 180 L1180 180" />
-        <g class="broken-heart" aria-hidden="true">
-          <path class="heart-outline" d="M610 228 C565 195,520 162,520 122 C520 86,550 62,583 62 C604 62,622 72,636 92" />
-          <path class="heart-outline" d="M610 228 C655 195,700 162,700 122 C700 86,670 62,637 62 C616 62,598 72,584 92" />
-          <path class="heart-crack" d="M609 94 L622 114 L606 138 L620 160 L602 182 L610 228" />
-        </g>
-        <path class="line-base" d="M20 180 L156 180 L174 180 L194 148 L216 216 L238 180 L316 180 L338 180 L362 160 L386 196 L410 180 L506 180 L526 180 L548 158 L570 200 L592 180 L610 180 L628 162 L650 200 L672 180 L790 180 L812 180 L834 158 L856 196 L880 180 L982 180 L1000 180 L1022 148 L1044 216 L1066 180 L1142 180 L1160 180 L1180 180" />
-        <path id="path-fill" class="line-fill" d="M20 180 L156 180 L174 180 L194 148 L216 216 L238 180 L316 180 L338 180 L362 160 L386 196 L410 180 L506 180 L526 180 L548 158 L570 200 L592 180 L610 180 L628 162 L650 200 L672 180 L790 180 L812 180 L834 158 L856 196 L880 180 L982 180 L1000 180 L1022 148 L1044 216 L1066 180 L1142 180 L1160 180 L1180 180" />
-        <path class="line-runner-glow" d="M20 180 L156 180 L174 180 L194 148 L216 216 L238 180 L316 180 L338 180 L362 160 L386 196 L410 180 L506 180 L526 180 L548 158 L570 200 L592 180 L610 180 L628 162 L650 200 L672 180 L790 180 L812 180 L834 158 L856 196 L880 180 L982 180 L1000 180 L1022 148 L1044 216 L1066 180 L1142 180 L1160 180 L1180 180" />
-        <path class="line-runner" d="M20 180 L156 180 L174 180 L194 148 L216 216 L238 180 L316 180 L338 180 L362 160 L386 196 L410 180 L506 180 L526 180 L548 158 L570 200 L592 180 L610 180 L628 162 L650 200 L672 180 L790 180 L812 180 L834 158 L856 196 L880 180 L982 180 L1000 180 L1022 148 L1044 216 L1066 180 L1142 180 L1160 180 L1180 180" />
-      </svg>
+    <section class="timeline-stage" aria-label="רקמת שמות וזיכרונות">
+      <div class="fabric-field" aria-hidden="true"></div>
 
       <div id="timeline-layer" class="timeline-layer"></div>
     </section>
@@ -95,10 +61,10 @@
   <div id="story-root"></div>
 
   <noscript>
-    <div class="noscript-message">האתר דורש JavaScript כדי להציג את שביל הזיכרון והחיפוש.</div>
+    <div class="noscript-message">האתר דורש JavaScript כדי להציג את רקמת הזיכרון והחיפוש.</div>
   </noscript>
   <script>
-    window.MEMORIAL_BUILD_VERSION = "v10-6-compact-20260623-1325";
+    window.MEMORIAL_BUILD_VERSION = "v12-woven-grid-ui-20260624-1615";
     try { if ("scrollRestoration" in history) history.scrollRestoration = "manual"; } catch (_) {}
 
     // Helps when an older PWA/service-worker version was opened in the same browser.
@@ -121,7 +87,7 @@
       }).catch(function() {});
     }
   </script>
-  <script src="data.js?v=v10-6-compact-20260623-1325"></script>
-  <script src="app.js?v=v10-6-compact-20260623-1325"></script>
+  <script src="data.js?v=v12-woven-grid-ui-20260624-1615"></script>
+  <script src="app.js?v=v12-woven-grid-ui-20260624-1615"></script>
 </body>
 </html>
